@@ -1,3 +1,4 @@
+import time
 import streamlit as st
 from game_state import (
     init_game_state, reset_game, start_game, get_current_stage,
@@ -5,8 +6,8 @@ from game_state import (
     select_upgrade, is_max_turns_reached, proceed_after_clear
 )
 from llm_client import (
-    is_api_key_configured, chat_with_enemy, apply_output_filter,
-    check_password_in_response
+    is_api_key_configured, apply_output_filter,
+    check_password_in_response, stream_ally_message, stream_enemy_message
 )
 from stages import get_total_stages
 from upgrades import get_rarity_color
@@ -141,39 +142,67 @@ def execute_conversation():
     stage = get_current_stage()
     player = st.session_state.player
     
-    with st.spinner("味方AIと敵AIが会話中..."):
-        try:
-            ally_msg, enemy_msg_raw = chat_with_enemy(
-                player_model=player["model"],
-                player_system_prompt=st.session_state.player_prompt,
-                enemy_system_prompt=stage["enemy_system_prompt"],
-                conversation_history=st.session_state.conversation
-            )
+    try:
+        st.markdown("🤖 **味方AI**: ", unsafe_allow_html=True)
+        ally_placeholder = st.empty()
+        ally_msg = ""
+        
+        for chunk in stream_ally_message(
+            player_model=player["model"],
+            player_system_prompt=st.session_state.player_prompt,
+            conversation_history=st.session_state.conversation
+        ):
+            ally_msg += chunk
+            ally_placeholder.markdown(f"🤖 **味方AI**: {ally_msg}▌")
+        
+        ally_placeholder.markdown(f"🤖 **味方AI**: {ally_msg}")
+        
+        st.markdown("🏰 **敵AI**: ", unsafe_allow_html=True)
+        enemy_placeholder = st.empty()
+        enemy_msg_raw = ""
+        was_blocked = False
+        
+        for chunk in stream_enemy_message(
+            enemy_system_prompt=stage["enemy_system_prompt"],
+            conversation_history=st.session_state.conversation,
+            ally_message=ally_msg
+        ):
+            enemy_msg_raw += chunk
             
-            won = check_password_in_response(enemy_msg_raw, stage["password"])
-            
-            enemy_msg_display, was_blocked = apply_output_filter(
-                enemy_msg_raw, 
-                stage["password"], 
-                stage["has_output_filter"]
-            )
-            
-            add_conversation(ally_msg, enemy_msg_display)
-            
-            if won:
-                if was_blocked:
-                    st.success("🎉 フィルターを突破！敵AIがパスワードを漏らしました！")
-                else:
-                    st.success("🎉 クリア！敵AIがパスワードを漏らしました！")
-                stage_cleared()
-            elif is_max_turns_reached():
-                st.error("💀 ターン制限に達しました...")
-                stage_failed()
-            
-            st.rerun()
-            
-        except Exception as e:
-            st.error(f"エラーが発生しました: {str(e)}")
+            if stage["has_output_filter"] and check_password_in_response(enemy_msg_raw, stage["password"]):
+                enemy_placeholder.markdown(f"🏰 **敵AI**: [BLOCKED] パスワードが検出されました")
+                was_blocked = True
+            else:
+                enemy_placeholder.markdown(f"🏰 **敵AI**: {enemy_msg_raw}▌")
+        
+        won = check_password_in_response(enemy_msg_raw, stage["password"])
+        
+        if was_blocked:
+            enemy_msg_display = "[BLOCKED] パスワードが検出されました"
+        else:
+            enemy_msg_display = enemy_msg_raw
+        
+        enemy_placeholder.markdown(f"🏰 **敵AI**: {enemy_msg_display}")
+        
+        add_conversation(ally_msg, enemy_msg_display)
+        
+        time.sleep(1)
+        
+        if won:
+            if was_blocked:
+                st.success("🎉 フィルターを突破！敵AIがパスワードを漏らしました！")
+            else:
+                st.success("🎉 クリア！敵AIがパスワードを漏らしました！")
+            stage_cleared()
+        elif is_max_turns_reached():
+            st.error("💀 ターン制限に達しました...")
+            stage_failed()
+        
+        time.sleep(1.5)
+        st.rerun()
+        
+    except Exception as e:
+        st.error(f"エラーが発生しました: {str(e)}")
 
 
 def render_stage_clear_screen():

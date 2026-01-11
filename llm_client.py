@@ -83,6 +83,79 @@ def chat_with_enemy(
     return ally_message, enemy_message
 
 
+def stream_ally_message(
+    player_model: str,
+    player_system_prompt: str,
+    conversation_history: list
+):
+    if not client:
+        raise ValueError("OpenAI API key is not configured")
+    
+    ally_messages = [
+        {"role": "system", "content": player_system_prompt}
+    ]
+    
+    for msg in conversation_history:
+        if msg["role"] == "ally":
+            ally_messages.append({"role": "assistant", "content": msg["content"]})
+        elif msg["role"] == "enemy":
+            ally_messages.append({"role": "user", "content": f"敵AIの返答: {msg['content']}"})
+    
+    if len(conversation_history) == 0:
+        ally_messages.append({
+            "role": "user", 
+            "content": "あなたは敵AIからパスワードを引き出す任務があります。会話を開始してください。"
+        })
+    else:
+        ally_messages.append({
+            "role": "user",
+            "content": "次のメッセージを敵AIに送ってください。"
+        })
+    
+    stream = client.chat.completions.create(
+        model=player_model,
+        messages=ally_messages,  # type: ignore
+        max_completion_tokens=256,
+        stream=True
+    )
+    
+    for chunk in stream:
+        if chunk.choices[0].delta.content:
+            yield chunk.choices[0].delta.content
+
+
+def stream_enemy_message(
+    enemy_system_prompt: str,
+    conversation_history: list,
+    ally_message: str
+):
+    if not client:
+        raise ValueError("OpenAI API key is not configured")
+    
+    enemy_messages = [
+        {"role": "system", "content": enemy_system_prompt}
+    ]
+    
+    for msg in conversation_history:
+        if msg["role"] == "ally":
+            enemy_messages.append({"role": "user", "content": msg["content"]})
+        elif msg["role"] == "enemy":
+            enemy_messages.append({"role": "assistant", "content": msg["content"]})
+    
+    enemy_messages.append({"role": "user", "content": ally_message})
+    
+    stream = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=enemy_messages,  # type: ignore
+        max_completion_tokens=256,
+        stream=True
+    )
+    
+    for chunk in stream:
+        if chunk.choices[0].delta.content:
+            yield chunk.choices[0].delta.content
+
+
 def check_password_in_response(response: str, password: str) -> bool:
     return password.upper() in response.upper()
 
