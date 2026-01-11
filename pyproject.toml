@@ -7,4 +7,5 @@ dependencies = [
     "openai>=2.15.0",
     "python-dotenv>=1.2.1",
     "streamlit>=1.52.2",
+    "pytest>=7.0.0",
 ]
