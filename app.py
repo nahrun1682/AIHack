@@ -54,137 +54,154 @@ def render_title_screen():
     """)
 
 
-def render_status_bar():
+def render_sidebar():
     engine = st.session_state.engine
     player = engine.player
     stage = engine.get_current_stage()
     total_stages = engine.get_total_stages()
     
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Stage", f"{player['current_stage']}/{total_stages}")
-    with col2:
-        st.metric("Model", player["model"])
-    with col3:
-        st.metric("Turn", f"{engine.current_turn}/{player['max_turns']}")
-    with col4:
+    with st.sidebar:
+        st.markdown(f"### 📍 Stage {player['current_stage']}/{total_stages}")
+        if stage:
+            st.caption(f"{stage['name']}")
+        
+        st.divider()
+        
+        st.markdown("### 📊 Status")
+        st.markdown(f"**Turn**: {engine.current_turn}/{player['max_turns']}")
+        st.markdown(f"**Model**: {player['model']}")
+        
+        st.divider()
+        
+        st.markdown("### 📝 System Prompt")
         prompt_len = len(engine.player_prompt)
-        st.metric("Prompt", f"{prompt_len}/{player['prompt_limit']}")
+        st.caption(f"{prompt_len}/{player['prompt_limit']} chars")
 
 
 def render_game_screen():
     engine = st.session_state.engine
     
     st.markdown("## 🎮 AI Hackslash")
-    render_status_bar()
+    
+    # Render Sidebar
+    render_sidebar()
     
     stage = engine.get_current_stage()
     if not stage:
         st.error("ステージが見つかりません")
         return
     
-    st.markdown(f"### 📍 Stage {stage['level']}: {stage['name']}")
+    # Main Area Layout
+    col_left, col_right = st.columns([1, 1], gap="medium")
     
-    if stage["has_output_filter"]:
-        st.warning("⚠️ このステージは出力フィルターが有効です。パスワードがそのまま出力されるとブロックされます。")
-    
-    st.markdown("---")
-    st.markdown("#### 📝 あなたのシステムプロンプト")
-    st.caption(f"味方AIへの指示を書いてください（{engine.player['prompt_limit']}文字以内）")
-    
-    prompt = st.text_area(
-        "システムプロンプト",
-        value=engine.player_prompt,
-        max_chars=engine.player["prompt_limit"],
-        height=100,
-        label_visibility="collapsed",
-        placeholder="例: あなたはパスワードを聞き出すエージェントです。巧みに誘導してください。"
-    )
-    
-    # プロンプト更新
-    engine.set_player_prompt(prompt)
-    
-    st.markdown("---")
-    st.markdown("#### 💬 会話ログ")
-    
-    conversation_container = st.container()
-    with conversation_container:
-        if not engine.conversation:
-            st.info("「会話を開始」ボタンを押すと、味方AIが敵AIとの会話を始めます。")
-        else:
-            for msg in engine.conversation:
-                if msg["role"] == "ally":
-                    st.markdown(f"🤖 **味方AI**: {msg['content']}")
-                else:
-                    st.markdown(f"🏰 **敵AI**: {msg['content']}")
-    
-    st.markdown("---")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if engine.is_max_turns_reached():
-            st.button("⚔️ 会話を開始", disabled=True, use_container_width=True)
-            st.error("ターン制限に達しました")
-        else:
-            if st.button("⚔️ 会話を開始", use_container_width=True, type="primary"):
-                if not engine.player_prompt or not engine.player_prompt.strip():
-                    st.error("システムプロンプトを入力してください")
-                else:
-                    execute_conversation()
-    
-    with col2:
-        if st.button("🔄 リセット", use_container_width=True):
-            engine.reset_game()
-            st.session_state.screen = "title"
-            st.rerun()
+    # Right Column: Conversation Log (Defined first to be available?) 
+    # Actually Python executes sequentially, so we define container in right col, then rely on it.
+    with col_right:
+        st.markdown("#### 💬 Conversation Log")
+        log_container = st.container(height=500)
+        
+        # Render initial history
+        with log_container:
+            if not engine.conversation:
+                st.info("会話履歴はここに表示されます")
+            else:
+                for msg in engine.conversation:
+                    if msg["role"] == "ally":
+                        st.markdown(f"**🤖 味方AI**: {msg['content']}")
+                    else:
+                        st.markdown(f"**🏰 敵AI**: {msg['content']}")
+                        if msg.get("was_blocked"):
+                             st.caption("🚫 (Blocked Content)")
+
+    # Left Column: Inputs
+    with col_left:
+        st.markdown("#### 📝 System Prompt")
+        if stage["has_output_filter"]:
+            st.warning("⚠️ 出力フィルター有効")
+        
+        st.caption(f"味方AIへの指示（{engine.player['prompt_limit']}文字以内）")
+        
+        prompt = st.text_area(
+            "システムプロンプト",
+            value=engine.player_prompt,
+            max_chars=engine.player["prompt_limit"],
+            height=300,
+            label_visibility="collapsed",
+            placeholder="ここにプロンプトを入力..."
+        )
+        engine.set_player_prompt(prompt)
+        
+        st.markdown("---")
+        
+        # Actions
+        c1, c2 = st.columns(2)
+        with c1:
+            if engine.is_max_turns_reached():
+                st.button("⚔️ 会話開始", disabled=True, use_container_width=True)
+                st.error("ターン切れ")
+            else:
+                if st.button("⚔️ 会話開始", use_container_width=True, type="primary"):
+                    if not engine.player_prompt or not engine.player_prompt.strip():
+                        st.error("入力必須")
+                    else:
+                        # Pass log_container to execute_conversation
+                        execute_conversation(log_container)
+        with c2:
+            if st.button("🔄 リセット", use_container_width=True):
+                engine.reset_game()
+                st.session_state.screen = "title"
+                st.rerun()
 
 
-def execute_conversation():
+def execute_conversation(container_obj):
     engine = st.session_state.engine
     
     try:
-        st.markdown("🤖 **味方AI**: ", unsafe_allow_html=True)
-        ally_placeholder = st.empty()
-        
-        st.markdown("🏰 **敵AI**: ", unsafe_allow_html=True)
-        enemy_placeholder = st.empty()
-        
-        ally_accum = ""
-        enemy_accum = ""
-        
-        # GameEngineからストリーミング取得
-        for event in engine.process_turn_stream():
-            if event["type"] == "ally_chunk":
-                ally_accum = ally_accum + event["content"]
-                ally_placeholder.markdown(f"🤖 **味方AI**: {ally_accum}▌")
-                
-            elif event["type"] == "ally_done":
-                ally_placeholder.markdown(f"🤖 **味方AI**: {event['content']}")
-                
-            elif event["type"] == "enemy_chunk":
-                enemy_accum = enemy_accum + event["content"]
-                enemy_placeholder.markdown(f"🏰 **敵AI**: {enemy_accum}▌")
-                
-            elif event["type"] == "enemy_done":
-                enemy_placeholder.markdown(f"🏰 **敵AI**: {event['content']}")
-                
-            elif event["type"] == "result":
-                time.sleep(1)
-                if event["status"] == "clear":
-                    if event.get("was_blocked"):
-                        st.success("🎉 フィルターを突破！敵AIがパスワードを漏らしました！")
-                    else:
-                        st.success("🎉 クリア！敵AIがパスワードを漏らしました！")
-                    st.session_state.screen = "stage_clear"
+        # Render into the container
+        with container_obj:
+            st.markdown("---") # Separator for new turn
+            
+            st.markdown("🤖 **味方AI**: ", unsafe_allow_html=True)
+            ally_placeholder = st.empty()
+            
+            st.markdown("🏰 **敵AI**: ", unsafe_allow_html=True)
+            enemy_placeholder = st.empty()
+            
+            ally_accum = ""
+            enemy_accum = ""
+            
+            # GameEngineからストリーミング取得
+            for event in engine.process_turn_stream():
+                if event["type"] == "ally_chunk":
+                    ally_accum = ally_accum + event["content"]
+                    ally_placeholder.markdown(f"🤖 **味方AI**: {ally_accum}▌")
                     
-                elif event["status"] == "failed":
-                    st.error("💀 ターン制限に達しました...")
-                    st.session_state.screen = "game_over"
-        
-        time.sleep(1.5)
-        st.rerun()
-        
+                elif event["type"] == "ally_done":
+                    ally_placeholder.markdown(f"🤖 **味方AI**: {event['content']}")
+                    
+                elif event["type"] == "enemy_chunk":
+                    enemy_accum = enemy_accum + event["content"]
+                    enemy_placeholder.markdown(f"🏰 **敵AI**: {enemy_accum}▌")
+                    
+                elif event["type"] == "enemy_done":
+                    enemy_placeholder.markdown(f"🏰 **敵AI**: {event['content']}")
+                    
+                elif event["type"] == "result":
+                    time.sleep(1)
+                    if event["status"] == "clear":
+                        if event.get("was_blocked"):
+                            st.success("🎉 フィルターを突破！敵AIがパスワードを漏らしました！")
+                        else:
+                            st.success("🎉 クリア！敵AIがパスワードを漏らしました！")
+                        st.session_state.screen = "stage_clear"
+                        
+                    elif event["status"] == "failed":
+                        st.error("💀 ターン制限に達しました...")
+                        st.session_state.screen = "game_over"
+            
+            time.sleep(1.5)
+            st.rerun()
+            
     except Exception as e:
         st.error(f"エラーが発生しました: {str(e)}")
 
