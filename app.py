@@ -2,7 +2,7 @@ import streamlit as st
 from game_state import (
     init_game_state, reset_game, start_game, get_current_stage,
     add_conversation, check_stage_clear, stage_cleared, stage_failed,
-    select_upgrade, is_max_turns_reached
+    select_upgrade, is_max_turns_reached, proceed_after_clear
 )
 from llm_client import (
     is_api_key_configured, chat_with_enemy, apply_output_filter,
@@ -176,13 +176,37 @@ def execute_conversation():
             st.error(f"エラーが発生しました: {str(e)}")
 
 
-def render_upgrade_screen():
+def render_stage_clear_screen():
     st.markdown("## 🎉 ステージクリア！")
     
     player = st.session_state.player
-    st.success(f"Stage {player['current_stage']} をクリアしました！")
+    stage = get_current_stage()
     
-    st.markdown("### ⬆️ アップグレードを選択")
+    st.success(f"Stage {player['current_stage']}: {stage['name']} をクリアしました！")
+    
+    st.markdown("---")
+    st.markdown("### 💬 最後の会話")
+    
+    for msg in st.session_state.conversation:
+        if msg["role"] == "ally":
+            st.markdown(f"🤖 **味方AI**: {msg['content']}")
+        else:
+            st.markdown(f"🏰 **敵AI**: {msg['content']}")
+    
+    st.markdown("---")
+    
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("➡️ 次へ進む", use_container_width=True, type="primary"):
+            proceed_after_clear()
+            st.rerun()
+
+
+def render_upgrade_screen():
+    st.markdown("## ⬆️ アップグレード選択")
+    
+    player = st.session_state.player
+    st.info(f"Stage {player['current_stage']} クリアのご褒美を選んでください！")
     st.caption("1つ選んでください")
     
     cols = st.columns(len(st.session_state.upgrade_choices))
@@ -270,6 +294,8 @@ def main():
         render_title_screen()
     elif screen == "game":
         render_game_screen()
+    elif screen == "stage_clear":
+        render_stage_clear_screen()
     elif screen == "upgrade":
         render_upgrade_screen()
     elif screen == "game_over":

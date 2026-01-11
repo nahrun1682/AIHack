@@ -66,6 +66,10 @@ def check_stage_clear(enemy_response: str) -> bool:
 
 def stage_cleared():
     st.session_state.stage_result = "clear"
+    st.session_state.screen = "stage_clear"
+
+
+def proceed_after_clear():
     player = st.session_state.player
     total_stages = get_total_stages()
     
