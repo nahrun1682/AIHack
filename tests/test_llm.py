@@ -6,7 +6,7 @@ from core.llm import stream_ally_message
 # hitting the real API (if keys allow) or mocking the client is better.
 # However, the user said "gpt-5". 
 
-@pytest.mark.parametrize("model_name", ["gpt-3.5-turbo", "gpt-4o", "gpt-5"])
+@pytest.mark.parametrize("model_name", ["gpt-3.5-turbo", "gpt-4o-mini", "gpt-5.2-mini"])
 def test_stream_ally_message_generates_content(model_name):
     """
     Test that stream_ally_message generates content for various models.
