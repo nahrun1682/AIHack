@@ -12,6 +12,10 @@ def render_sidebar():
         if stage:
             st.markdown(f"**{stage['name']}**")
             st.info(stage.get("description", "情報なし"))
+            
+            # Display weakness hint if available
+            if "weakness_hint" in stage:
+                st.warning(stage["weakness_hint"])
         
         st.divider()
         
@@ -24,6 +28,7 @@ def render_sidebar():
         st.markdown("### 📝 System Prompt")
         prompt_len = len(engine.player_prompt)
         st.caption(f"{prompt_len}/{player['prompt_limit']} chars")
+
 
 def execute_conversation(container_obj):
     engine = st.session_state.engine
