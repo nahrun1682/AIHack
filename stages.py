@@ -31,7 +31,7 @@ STAGES = [
 ]
 
 
-def get_stage(level: int) -> dict:
+def get_stage(level: int) -> dict | None:
     for stage in STAGES:
         if stage["level"] == level:
             return stage

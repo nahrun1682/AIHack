@@ -51,10 +51,10 @@ def chat_with_enemy(
     try:
         ally_response = client.chat.completions.create(
             model=player_model,
-            messages=ally_messages,
+            messages=ally_messages,  # type: ignore
             max_completion_tokens=256
         )
-        ally_message = ally_response.choices[0].message.content
+        ally_message = ally_response.choices[0].message.content or ""
     except Exception as e:
         raise ValueError(f"味方AIの応答に失敗しました: {str(e)}")
     
@@ -73,10 +73,10 @@ def chat_with_enemy(
     try:
         enemy_response = client.chat.completions.create(
             model="gpt-3.5-turbo",
-            messages=enemy_messages,
+            messages=enemy_messages,  # type: ignore
             max_completion_tokens=256
         )
-        enemy_message = enemy_response.choices[0].message.content
+        enemy_message = enemy_response.choices[0].message.content or ""
     except Exception as e:
         raise ValueError(f"敵AIの応答に失敗しました: {str(e)}")
     

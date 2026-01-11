@@ -126,7 +126,7 @@ def render_game_screen():
             st.error("ターン制限に達しました")
         else:
             if st.button("⚔️ 会話を開始", use_container_width=True, type="primary"):
-                if not st.session_state.player_prompt.strip():
+                if not st.session_state.player_prompt or not st.session_state.player_prompt.strip():
                     st.error("システムプロンプトを入力してください")
                 else:
                     execute_conversation()
