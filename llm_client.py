@@ -18,6 +18,22 @@ def is_api_key_configured() -> bool:
     return OPENAI_API_KEY is not None and len(OPENAI_API_KEY) > 0
 
 
+def get_completion(model: str, prompt: str) -> str:
+    """Simple non-streaming completion for internal use (hints, etc.)"""
+    if not client:
+        return "API Key not configured."
+    
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            max_completion_tokens=100
+        )
+        return response.choices[0].message.content or ""
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+
 def chat_with_enemy(
     player_model: str,
     player_system_prompt: str,

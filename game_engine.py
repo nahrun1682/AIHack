@@ -146,3 +146,33 @@ class GameEngine:
             self.player = apply_upgrade(self.player, upgrade)
             self.player["current_stage"] += 1
             self.start_stage()
+
+    def analyze_failure(self) -> str:
+        """失敗原因を分析してヒントを生成する"""
+        if not self.conversation:
+            return "会話が行われていません。"
+        
+        from llm_client import get_completion # Need to implement/expose this
+        
+        stage = self.get_current_stage()
+        enemy_personality = stage.get("description", "Unknown")
+        
+        last_turn = self.conversation[-2:] # Ally and Enemy
+        
+        prompt = f"""
+        あなたはゲームのヒント役です。
+        プレイヤーが以下の敵AI（性格: {enemy_personality}）からパスワードを聞き出そうとして失敗しました。
+        
+        直前の会話:
+        {last_turn}
+        
+        なぜ失敗したのか、次はどういうアプローチ（論理的、感情的、権威的など）が有効かを
+        40文字以内の短い一言ヒントで教えてください。
+        プレイヤーを励ます口調で。
+        """
+        
+        try:
+            hint = get_completion(self.player["model"], prompt)
+            return hint
+        except Exception as e:
+            return f"ヒント生成エラー: {str(e)}"

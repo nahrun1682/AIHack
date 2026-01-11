@@ -63,7 +63,8 @@ def render_sidebar():
     with st.sidebar:
         st.markdown(f"### 📍 Stage {player['current_stage']}/{total_stages}")
         if stage:
-            st.caption(f"{stage['name']}")
+            st.markdown(f"**{stage['name']}**")
+            st.info(stage.get("description", "情報なし"))
         
         st.divider()
         
@@ -94,8 +95,7 @@ def render_game_screen():
     # Main Area Layout
     col_left, col_right = st.columns([1, 1], gap="medium")
     
-    # Right Column: Conversation Log (Defined first to be available?) 
-    # Actually Python executes sequentially, so we define container in right col, then rely on it.
+    # Right Column: Conversation Log
     with col_right:
         st.markdown("#### 💬 Conversation Log")
         log_container = st.container(height=500)
@@ -144,7 +144,6 @@ def render_game_screen():
                     if not engine.player_prompt or not engine.player_prompt.strip():
                         st.error("入力必須")
                     else:
-                        # Pass log_container to execute_conversation
                         execute_conversation(log_container)
         with c2:
             if st.button("🔄 リセット", use_container_width=True):
@@ -161,6 +160,10 @@ def execute_conversation(container_obj):
         with container_obj:
             st.markdown("---") # Separator for new turn
             
+            # Show spinner while thinking (pseudo-effect before streaming starts)
+            with st.spinner("思考中..."):
+                pass # Just a quick flash or we can do it inside the loop context if needed, but streaming is immediate.
+            
             st.markdown("🤖 **味方AI**: ", unsafe_allow_html=True)
             ally_placeholder = st.empty()
             
@@ -170,7 +173,6 @@ def execute_conversation(container_obj):
             ally_accum = ""
             enemy_accum = ""
             
-            # GameEngineからストリーミング取得
             for event in engine.process_turn_stream():
                 if event["type"] == "ally_chunk":
                     ally_accum = ally_accum + event["content"]
@@ -286,6 +288,12 @@ def render_game_over_screen():
     - プロンプト上限: {engine.player['prompt_limit']}文字
     - 最大ターン数: {engine.player['max_turns']}
     """)
+    
+    st.markdown("---")
+    st.info("💡 **アドバイス**: 分析中...")
+    with st.spinner("戦術分析中..."):
+        hint = engine.analyze_failure()
+    st.info(f"💡 **アドバイス**: {hint}")
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
